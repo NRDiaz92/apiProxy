@@ -2,10 +2,10 @@ version: '3.7'
 
 services:
   api-proxy:
-    image: apiproxy
-    # build:
-    #     context: .
-    #     dockerfile: Dockerfile
+    #image: apiproxy
+    build:
+        context: .
+        dockerfile: Dockerfile
     restart: always
     networks:
         - api-proxy
