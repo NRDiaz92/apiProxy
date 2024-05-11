@@ -1,0 +1,6 @@
+flask
+redis
+html_to_json
+datetime
+requests
+Gunicorn

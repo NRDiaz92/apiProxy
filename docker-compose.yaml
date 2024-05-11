@@ -1,0 +1,63 @@
+version: '3.7'
+
+services:
+  api-proxy:
+    image: apiproxy
+    # build:
+    #     context: .
+    #     dockerfile: Dockerfile
+    restart: always
+    networks:
+        - api-proxy
+    environment:
+        REDIS_HOST: api-redis
+    volumes:
+        - ./src:/app
+    ports:
+        - 8888:80
+    links:
+        - api-redis
+    tty: true
+    labels:
+        - traefik.enable=true
+        - traefik.http.routers.web.entrypoints=web
+        - traefik.http.routers.web.rule=Host(`localhost`)
+          
+  api-redis:
+    container_name: api-redis
+    image: redis:alpine
+    command: redis-server
+    healthcheck:
+        test: ["CMD-SHELL", "redis-cli ping"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+    networks:
+        - api-proxy
+    ports:
+        - 6379:6379
+    labels:
+      - traefik.enable=false
+
+  traefik:
+    image: traefik:latest
+    command:
+        - --entrypoints.web.address=:80
+        - --api.insecure=true
+        - --providers.docker=true
+        - --log.level=info
+        - --log.format=json
+    ports:
+      - 8081:80
+      - 8080:8080
+    networks:
+        - api-proxy
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.enable=true
+      
+networks:
+    api-proxy:
+        name: api-proxy
