@@ -14,5 +14,5 @@ ADD src .
 
 RUN pip install --upgrade pip && pip install --upgrade -r requirements.txt
 
-ENTRYPOINT ["gunicorn"]
-CMD ["-b", "0.0.0.0:80", "app:app", "-w", "4", "--threads", "10"]
+ENTRYPOINT ["/bin/bash"]
+CMD ["init.sh"]

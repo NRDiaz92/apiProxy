@@ -1,36 +1,34 @@
+import ast
 from flask import abort
 from configs.redis import redisLimiter
 
-defaultLimit = "500000/seconds"
-
-Rules = {
-        "172.19.0.2": "15/minute",
-        "/categories": "2/minute",
-        "172.19.0.2;/sites": "15/hour",
-        "172.19.0.2;/categories": "5/day",
-        "152.152.152.152;/items": "10/minute"
-        }
+def ruleConfigs():
+    Rules = open("configs/limits.config", "r").read()
+    rulesConfig = ast.literal_eval(Rules)
+    return rulesConfig
 
 def rulesUpdater():
-    for Rule, Action in Rules.items():
-        redisUpdate = redisLimiter("rules", "Update", Rule, Action)
-    return redisUpdate
+    Rules = ruleConfigs()
+    for appName, limitConfigs in Rules.items():
+        for Rule, Action in limitConfigs.items():
+            redisLimiter("rules", "Update", appName, {"Rule": Rule, "Action": Action})
 
-def rulesChecker(remoteAddr, requestPath):
-    redisCheckRule = redisLimiter("rules", "Check", remoteAddr, requestPath)
+def rulesChecker(appName, ruleData):
+    redisCheckRule = redisLimiter("rules", "Check", appName, {"remoteAddr": ruleData["remoteAddr"], "requestPath": ruleData["requestPath"]})
     return redisCheckRule
 
-def limitCreator(ruleName, ruleData):
-    request, timeInSeconds = convertRuleToSeconds(ruleData)
-    redisCreate = redisLimiter("limits", "Create", ruleName, {"request": f"{request}", "timeInSeconds": f"{timeInSeconds}"})
+def limitCreator(appName, limitData):
+    print(f'limitData: {limitData}')
+    request, timeInSeconds = convertRuleToSeconds(limitData["ruleData"])
+    redisCreate = redisLimiter("limits", "Create", appName, {"ruleName": limitData["ruleName"], "request": request, "timeInSeconds": timeInSeconds})
     return redisCreate
 
-def limitsUpdater(ruleName, existingLimit):
-    redisUpdate = redisLimiter("limits", "Update", ruleName, existingLimit)
+def limitsUpdater(appName, limitData):
+    redisUpdate = redisLimiter("limits", "Update", appName, {"ruleName": limitData["ruleName"], "existingLimit": limitData["existingLimit"]})
     return redisUpdate
     
-def limitsChecker(ruleName, ruleData):
-    redisCheckLimit = redisLimiter("limits", "Check", ruleName, ruleData)
+def limitsChecker(appName, limitData):
+    redisCheckLimit = redisLimiter("limits", "Check", appName, {"ruleName": limitData["ruleName"], "ruleData": limitData["ruleData"]})
     return redisCheckLimit
     
 def requestBlock():
@@ -46,27 +44,26 @@ def convertRuleToSeconds(ruleData="0/0"):
     timeInSeconds = int(timeMeassure.replace(str(timeMeassure), str(eval(timeMeassure))))
     return requests, timeInSeconds
 
-def setLimits(app, request):
+def setLimits(appName, request):
+    rules = ruleConfigs()
     remoteAddr = request.remote_addr
-    if len(request.path.replace(f"/{app}", '')) > 0:
-        requestPath = request.path.replace(f"/{app}", '').split("/")[1]
+    if len(request.path.replace(f"/{appName}", '')) > 0:
+        requestPath = request.path.replace(f"/{appName}", '').split("/")[1]
     else:
-        requestPath = str(f"/{app}")
-    print(f"requestPath: {requestPath}")
-    baseRule = rulesChecker(remoteAddr, requestPath)
-    ruleName = baseRule.split(":")[0]
-    ruleData = baseRule.split(":")[1]
-    print(baseRule)
+        requestPath = str(f"{appName}")
+    baseRule = rulesChecker(appName, {"remoteAddr": remoteAddr, "requestPath": requestPath})
+    ruleData = baseRule.split(':')[2]
+    ruleName = baseRule.split(f':{ruleData}')[0]
     if baseRule != ':' or baseRule != '':
-        existingLimit = int(limitsChecker(ruleName, ruleData))
+        existingLimit = int(limitsChecker(appName, {"ruleName": ruleName, "ruleData": ruleData}))
         if existingLimit != "":
             if existingLimit > 0:
-                limitsUpdater(ruleName, existingLimit)
+                limitsUpdater(appName, {"ruleName": ruleName, "existingLimit": existingLimit})
             elif existingLimit < 0:
-                limitCreator(ruleName, ruleData)
+                limitCreator(appName, {"ruleName": ruleName, "ruleData": ruleData})
             else:
                 requestBlock()
         else:
-            limitCreator(ruleName, ruleData)
+            limitCreator(appName, {"ruleName": ruleName, "ruleData": ruleData})
     else:
         pass

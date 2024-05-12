@@ -11,6 +11,11 @@ services:
         - api-proxy
     environment:
         REDIS_HOST: api-redis
+        FLASK_IP: "0.0.0.0"
+        FLASK_PORT: 80
+        FLASK_APP: "app"
+        FLASK_WORKERS: 1
+        FLASK_THREADS: 50
     volumes:
         - ./src:/app
     ports:

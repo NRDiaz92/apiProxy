@@ -19,6 +19,8 @@ docker compose up -d
 
 ### Cómo funciona
 
+![alt text](diagram.png "Title")
+
 #### Api
 El servicio está creado en Flask, usando Gunicorn como servidor WSGI y se ejecuta a través de docker (Hay un docker-compose que ya se encarga de crear todos los recursos necesarios para su funcionamiento)
 
@@ -49,7 +51,7 @@ Podemos realizar una prueba de carga y respuesta con el siguiente comando, apunt
 
 ### Security Tests
 
-En el archivo ./src/configs/limiter.py podemos ver que hay un listado de reglas a constatar para bloquear los accesos, las mismas se configuran de la siguientes:
+En el archivo ./src/configs/limiter.config podemos ver que hay un listado de reglas a constatar para bloquear los accesos, las mismas se configuran de la siguientes maneras:
 
 #### == Este es el orden establecido de chequeo ==
 - "IP;Path": "Requests/Period"
@@ -67,9 +69,7 @@ Ejemplos:
 Las reglas se usan con todos los filtros en su conjunto, por lo que se pueden dar los siguientes casos:
 
 - El request proviene de la ip 192.168.0.1 al path /sites -> La regla tomada será la de path ya que es la regla con más peso.
-
 - El request proviene de la ip 192.168.0.1 al path /categories -> La regla tomada será la de IP;path ya que es la que matchea con ambos criterios.
-
 - El request proviene de la ip 192.168.0.1 al path / -> La regla tomada será la de IP ya que es la única regla que matchea al no tener ninguna regla con path "/" definido.
 
 #### Check rules
@@ -80,12 +80,12 @@ Dentro del contenedor de api-redis, ejecutamos redis-cli y con los siguientes co
 127.0.0.1:6379[1]> select 1
 OK
 127.0.0.1:6379[1]> keys *
-1) "172.19.0.2"
-2) "172.19.0.2;/categories"
-3) "152.152.152.152;/items"
-4) "172.19.0.2;/sites"
-5) "/categories"
-127.0.0.1:6379[1]> get 172.19.0.2
+1) "meli:172.19.0.2"
+2) "meli:172.19.0.2;/categories"
+3) "meli:152.152.152.152;/items"
+4) "meli:172.19.0.2;/sites"
+5) "meli:/categories"
+127.0.0.1:6379[1]> get meli:172.19.0.2
 "15/minute"
 ```
 
@@ -101,9 +101,9 @@ Dentro del contenedor de api-redis, ejecutamos redis-cli y con los siguientes co
 OK
 127.0.0.1:6379[2]> keys *
 1) "172.19.0.2;/categories"
-127.0.0.1:6379[2]> get 172.19.0.2;/categories
+127.0.0.1:6379[2]> get meli:172.19.0.2;/categories
 "0"
-127.0.0.1:6379[2]> TTL 172.19.0.2;/categories
+127.0.0.1:6379[2]> TTL meli:172.19.0.2;/categories
 (integer) 54449
 127.0.0.1:6379[2]> 
 ```

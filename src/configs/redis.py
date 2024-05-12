@@ -48,47 +48,53 @@ def redisLoggerGetLogsPerApp(appName, logDate):
     logEntries = redis.lrange(f"logs:{appName}:{logDate}", 0, -1)
     return logEntries
     
-def redisLimiter(limiterType, Option, Data, Args=''):
-    response = eval(f"{limiterType}{Option}{(limiterType, Data, Args)}")
+def redisLimiter(limiterType, Option, appName, Args=''):
+    response = eval(f"{limiterType}{Option}{(limiterType, appName, Args)}")
     return response
 
-def rulesUpdate(limiterType, Rule, Action):
+def rulesUpdate(limiterType, appName, Args):
     redis = redisConnect(limiterType)
     redis.flushdb
-    ruleUpdate = redis.set(Rule, Action)
-    return ruleUpdate
+    for Rule, Action in Args.items():
+        Rule = str(f'{appName}:{Args["Rule"]}')
+        Action = Args["Action"]
+        ruleUpdate = redis.set(Rule, Action)
+        if ruleUpdate:
+            print(f'Sucesfully updated rule: "{Rule}:{Action}"')
     
-def limitsCreate(limiterType, baseRule, limitData):
+def limitsCreate(limiterType, appName, Args):
     redis = redisConnect(limiterType)
-    limitCreate = redis.set(baseRule, limitData["request"], ex=limitData["timeInSeconds"])
+    ruleName = f'{Args["ruleName"]}'
+    limitCreate = redis.set(ruleName, Args["request"], ex=Args["timeInSeconds"])
     return limitCreate
 
-def rulesCheck(limiterType, remoteAddr, requestPath):
+def rulesCheck(limiterType, appName, Args):
     redis = redisConnect(limiterType)
-    if redis.keys(pattern=f"{remoteAddr};/{requestPath}"):
-        ruleName = redis.keys(pattern=f"{remoteAddr};/{requestPath}")[0]
-        ruleData = redis.get(f"{remoteAddr};/{requestPath}")
-    elif redis.keys(pattern=f"/{requestPath}"):
-        ruleName = redis.keys(pattern=f"/{requestPath}")[0]
-        ruleData = redis.get(f"/{requestPath}")
-    elif redis.keys(pattern=f"{remoteAddr}"):
-        ruleName = redis.keys(pattern=f"{remoteAddr}")[0]
-        ruleData = redis.get(remoteAddr)
+    if redis.keys(pattern=f'{appName}:{Args["remoteAddr"]};/{Args["requestPath"]}'):
+        ruleName = redis.keys(pattern=f'{appName}:{Args["remoteAddr"]};/{Args["requestPath"]}')[0]
+        ruleData = redis.get(f'{appName}:{Args["remoteAddr"]};/{Args["requestPath"]}')
+    elif redis.keys(pattern=f'{appName}:/{Args["requestPath"]}'):
+        ruleName = redis.keys(pattern=f'{appName}:/{Args["requestPath"]}')[0]
+        ruleData = redis.get(f'{appName}:/{Args["requestPath"]}')
+    elif redis.keys(pattern=f'{appName}:{Args["remoteAddr"]}'):
+        ruleName = redis.keys(pattern=f'{appName}:{Args["remoteAddr"]}')[0]
+        ruleData = redis.get(f'{appName}:{Args["remoteAddr"]}')
     else:
         ruleName = ""
         ruleData = ""
+    print(str(f"{ruleName}:{ruleData}"))
     return str(f"{ruleName}:{ruleData}")
     
-def limitsCheck(limiterType, ruleName, ruleData):
+def limitsCheck(limiterType, appName, Args):
     redis = redisConnect(limiterType)
-    if redis.keys(pattern=f"{ruleName}"):
-        limitValue = redis.get(ruleName)
+    if redis.keys(pattern=Args["ruleName"]):
+        limitValue = redis.get(Args["ruleName"])
     else:
         limitValue = -1
     return limitValue
     
-def limitsUpdate(limiterType, ruleName, existingLimit):
+def limitsUpdate(limiterType, appName, Args):
     redis = redisConnect(limiterType)
-    newLimit = int(existingLimit) - 1
-    limitValue = redis.set(ruleName, newLimit, keepttl=True)
+    newLimit = int(Args["existingLimit"]) - 1
+    limitValue = redis.set(Args["ruleName"], newLimit, keepttl=True)
     return limitValue
